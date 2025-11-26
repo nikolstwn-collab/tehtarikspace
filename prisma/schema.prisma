@@ -1,0 +1,191 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ===== USERS & AUTH =====
+model User {
+  id                   String                @id @default(uuid())
+  username             String                @unique
+  password             String
+  role                 Role                  @default(KARYAWAN)
+  employeeId           String?               @unique @map("employee_id")
+  createdAt            DateTime              @default(now()) @map("created_at")
+  purchaseTransactions PurchaseTransaction[]
+  salesTransactions    SalesTransaction[]
+  employee             Employee?             @relation(fields: [employeeId], references: [id])
+
+  @@map("users")
+}
+
+// ===== EMPLOYEES =====
+model Employee {
+  id          String       @id @default(cuid()) @map("id")
+  name        String
+  birthDate   DateTime     @map("birth_date")
+  address     String
+  gender      Gender
+  phone       String
+  position    String
+  photoUrl    String?      @map("photo_url")
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+  attendances Attendance[]
+  shifts      Shift[]
+  user        User?
+
+  @@map("employees")
+}
+
+// ===== SHIFTS =====
+model Shift {
+  id         String    @id @default(uuid())
+  employeeId String    @map("employee_id")
+  dayOfWeek  DayOfWeek @map("day_of_week")
+  shiftTime  String    @map("shift_time")
+  isActive   Boolean   @default(true) @map("is_active")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+  employee   Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@map("shifts")
+}
+
+// ===== ATTENDANCE =====
+model Attendance {
+  id         String           @id @default(uuid())
+  employeeId String           @map("employee_id")
+  date       DateTime
+  status     AttendanceStatus
+  createdAt  DateTime         @default(now()) @map("created_at")
+  employee   Employee         @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@map("attendances")
+}
+
+// ===== PRODUCTS =====
+model Product {
+  id         String          @id @default(cuid()) @map("id")
+  name       String
+  price      Decimal         @db.Decimal(10, 2)
+  stock      Int
+  category   ProductCategory
+  photoUrl   String?         @map("photo_url")
+  createdAt  DateTime        @default(now()) @map("created_at")
+  updatedAt  DateTime        @updatedAt @map("updated_at")
+  recipes    ProductRecipe[]
+  salesItems SalesItem[]
+
+  @@map("products")
+}
+
+// ===== SALES TRANSACTIONS =====
+model SalesTransaction {
+  id              String        @id @default(cuid()) @map("id")
+  transactionDate DateTime      @default(now()) @map("transaction_date")
+  paymentMethod   PaymentMethod @map("payment_method")
+  totalAmount     Decimal       @map("total_amount") @db.Decimal(10, 2)
+  createdBy       String?       @map("created_by")      // OPTIONAL sekarang
+  createdAt       DateTime      @default(now()) @map("created_at")
+  items           SalesItem[]
+  user            User?         @relation(fields: [createdBy], references: [id]) // OPTIONAL
+
+  @@map("sales_transactions")
+}
+
+model SalesItem {
+  id                 String           @id @default(uuid())
+  salesTransactionId String           @map("sales_transaction_id")
+  productId          String           @map("product_id")
+  productName        String           @map("product_name")
+  quantity           Int
+  price              Decimal          @db.Decimal(10, 2)
+  subtotal           Decimal          @db.Decimal(10, 2)
+  product            Product          @relation(fields: [productId], references: [id])
+  salesTransaction   SalesTransaction @relation(fields: [salesTransactionId], references: [id], onDelete: Cascade)
+
+  @@map("sales_items")
+}
+
+// ===== PURCHASE TRANSACTIONS =====
+model PurchaseTransaction {
+  id              String   @id @default(cuid()) @map("id")
+  transactionDate DateTime @default(now()) @map("transaction_date")
+  itemName        String   @map("item_name")
+  quantity        Int
+  category        String
+  totalAmount     Decimal  @map("total_amount") @db.Decimal(10, 2)
+  createdBy       String?  @map("created_by")                // OPTIONAL sekarang
+  createdAt       DateTime @default(now()) @map("created_at")
+  user            User?    @relation(fields: [createdBy], references: [id]) // OPTIONAL
+
+  @@map("purchase_transactions")
+}
+
+// ===== RAW MATERIALS =====
+model RawMaterial {
+  id        String          @id @default(cuid()) @map("id")
+  name      String
+  category  String
+  stock     Decimal         @db.Decimal(10, 2)
+  unit      String
+  createdAt DateTime        @default(now()) @map("created_at")
+  updatedAt DateTime        @updatedAt @map("updated_at")
+  recipes   ProductRecipe[]
+
+  @@map("raw_materials")
+}
+
+model ProductRecipe {
+  id             String      @id @default(uuid())
+  productId      String      @map("product_id")
+  rawMaterialId  String      @map("raw_material_id")
+  quantityNeeded Decimal     @map("quantity_needed") @db.Decimal(10, 2)
+  createdAt      DateTime    @default(now()) @map("created_at")
+  product        Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  rawMaterial    RawMaterial @relation(fields: [rawMaterialId], references: [id], onDelete: Cascade)
+
+  @@map("product_recipes")
+}
+
+enum Role {
+  OWNER
+  KARYAWAN
+}
+
+enum Gender {
+  L
+  P
+}
+
+enum DayOfWeek {
+  SENIN
+  SELASA
+  RABU
+  KAMIS
+  JUMAT
+  SABTU
+  MINGGU
+}
+
+enum AttendanceStatus {
+  HADIR
+  TIDAK_HADIR
+}
+
+enum ProductCategory {
+  TEH_TARIK
+  MAKANAN
+  SNACK
+  MINUMAN_LAIN
+}
+
+enum PaymentMethod {
+  CASH
+  EWALLET
+  DEBIT
+}

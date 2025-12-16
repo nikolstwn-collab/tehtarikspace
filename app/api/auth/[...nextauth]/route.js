@@ -10,10 +10,9 @@ export const authOptions = {
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
-        // Dummy user list sementara (bisa diganti dari DB)
         const users = [
           { id: "1", username: "admin", password: "1234", role: "OWNER" },
-          { id: "2", username: "staff", password: "123", role: "KARYAWAN" },
+          { id: "2", username: "staff", password: "12345", role: "KARYAWAN" },
         ];
 
         const user = users.find(
@@ -24,10 +23,9 @@ export const authOptions = {
 
         if (!user) return null;
 
-        // Kembalikan data user yang disimpan ke JWT
         return {
           id: user.id,
-          username: user.username,
+          name: user.username,   // ⬅️ PENTING
           role: user.role,
         };
       },
@@ -40,21 +38,17 @@ export const authOptions = {
 
   callbacks: {
     async jwt({ token, user }) {
-      // Ketika user login, tambahkan data user ke token
       if (user) {
         token.id = user.id;
-        token.username = user.username;
         token.role = user.role;
       }
       return token;
     },
+
     async session({ session, token }) {
-      // Masukkan token.id & token.username ke dalam session.user
-      session.user = {
-        id: token.id,
-        username: token.username,
-        role: token.role,
-      };
+      // ❗ JANGAN TIMPA session.user
+      session.user.id = token.id;
+      session.user.role = token.role;
       return session;
     },
   },
@@ -65,5 +59,4 @@ export const authOptions = {
 };
 
 const handler = NextAuth(authOptions);
-
 export { handler as GET, handler as POST };

@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import toast from 'react-hot-toast';
 import EmployeeModal from '@/components/EmployeeModal';
-import { UserPlus, Search, Trash2, Edit2, CheckCircle, XCircle } from 'lucide-react';
+import { UserPlus, Search, Trash2, Edit2, CheckCircle, XCircle, Upload } from 'lucide-react';
 
 export default function PegawaiPage() {
   const { data: session } = useSession();
@@ -12,6 +12,8 @@ export default function PegawaiPage() {
   const [attendance, setAttendance] = useState({});
   const [selectedEmployee, setSelectedEmployee] = useState(null);
   const [showModal, setShowModal] = useState(false);
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [uploadFile, setUploadFile] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const isOwner = session?.user?.role === 'OWNER';
 
@@ -52,27 +54,38 @@ export default function PegawaiPage() {
     fetchAttendance();
   }, []);
 
-  // === Handle Absen Hari Ini ===
-  async function handleAttendance(id) {
+  // === Handle upload Excel ===
+  async function handleUploadExcel(e) {
+    e.preventDefault();
+
+    if (!uploadFile) {
+      toast.error('Pilih file Excel terlebih dahulu');
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', uploadFile);
+
     try {
-      const res = await fetch('/api/attendance', {
+      const res = await fetch('/api/employees/upload', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ employeeId: id, status: 'HADIR' }),
+        body: formData,
       });
 
       const data = await res.json();
 
       if (!res.ok) {
-        toast.error(data.message || 'Pegawai sudah absen hari ini');
+        toast.error(data.error || 'Gagal mengupload file');
         return;
       }
 
-      toast.success('Absensi berhasil disimpan!');
+      toast.success('Import pegawai berhasil!');
+      setShowUploadModal(false);
+      setUploadFile(null);
+      fetchEmployees();
       fetchAttendance();
-    } catch (err) {
-      console.error(err);
-      toast.error('Terjadi kesalahan saat menyimpan absensi');
+    } catch {
+      toast.error('Terjadi kesalahan saat upload');
     }
   }
 
@@ -116,16 +129,27 @@ export default function PegawaiPage() {
           </div>
 
           {isOwner && (
-            <button
-              onClick={() => {
-                setSelectedEmployee(null);
-                setShowModal(true);
-              }}
-              className="flex items-center gap-2 bg-tea text-white px-4 py-2 rounded-lg hover:bg-tea-dark transition"
-            >
-              <UserPlus className="w-4 h-4" />
-              Tambah Pegawai
-            </button>
+            <>
+              {/* BUTTON UPLOAD */}
+              <button
+                onClick={() => setShowUploadModal(true)}
+                className="flex items-center gap-2 bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition"
+              >
+                <Upload className="w-4 h-4" /> Upload Excel
+              </button>
+
+              {/* BUTTON TAMBAH */}
+              <button
+                onClick={() => {
+                  setSelectedEmployee(null);
+                  setShowModal(true);
+                }}
+                className="flex items-center gap-2 bg-tea text-white px-4 py-2 rounded-lg hover:bg-tea-dark transition"
+              >
+                <UserPlus className="w-4 h-4" />
+                Tambah Pegawai
+              </button>
+            </>
           )}
         </div>
       </div>
@@ -186,7 +210,6 @@ export default function PegawaiPage() {
                   </div>
                 </div>
 
-                {/* Tombol Aksi Owner */}
                 {isOwner && (
                   <div className="absolute top-3 right-3 flex gap-2 opacity-0 group-hover:opacity-100 transition">
                     <button
@@ -223,6 +246,40 @@ export default function PegawaiPage() {
           }}
           currentUserRole={session?.user?.role}
         />
+      )}
+
+      {/* Modal Upload Excel */}
+      {showUploadModal && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
+          <div className="bg-white w-full max-w-md rounded-xl p-6">
+            <h3 className="text-xl font-semibold mb-4">Upload Excel Pegawai</h3>
+
+            <form onSubmit={handleUploadExcel} className="space-y-4">
+              <input
+                type="file"
+                accept=".xlsx,.xls"
+                onChange={(e) => setUploadFile(e.target.files[0])}
+                className="w-full border p-2 rounded-lg"
+              />
+
+              <div className="flex gap-3 pt-3">
+                <button
+                  type="button"
+                  onClick={() => setShowUploadModal(false)}
+                  className="flex-1 py-2 border rounded-lg"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+                >
+                  Upload
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -4,7 +4,7 @@
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
-import { Package, Plus, Edit, Trash2, Search, AlertTriangle } from 'lucide-react';
+import { Package, Plus, Edit, Trash2, Search, AlertTriangle, Upload } from 'lucide-react';
 import toast from 'react-hot-toast';
 import RawMaterialModal from '@/components/RawMaterialModal';
 
@@ -16,6 +16,10 @@ export default function BahanBakuPage() {
   const [showModal, setShowModal] = useState(false);
   const [editingMaterial, setEditingMaterial] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+
+  // 🔥 NEW: Upload Excel Modal
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [uploadFile, setUploadFile] = useState(null);
 
   // Redirect if not owner
   useEffect(() => {
@@ -75,6 +79,40 @@ export default function BahanBakuPage() {
     fetchMaterials();
   };
 
+  // 🔥 NEW: Upload handler
+  async function handleUploadExcel(e) {
+    e.preventDefault();
+
+    if (!uploadFile) {
+      toast.error('Pilih file Excel terlebih dahulu!');
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', uploadFile);
+
+    try {
+      const res = await fetch('/api/raw-materials/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        toast.error(data.error || 'Gagal mengupload file');
+        return;
+      }
+
+      toast.success('Import bahan baku berhasil!');
+      setShowUploadModal(false);
+      setUploadFile(null);
+      fetchMaterials();
+    } catch {
+      toast.error('Terjadi kesalahan saat upload');
+    }
+  }
+
   const filteredMaterials = materials.filter(material =>
     material.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     material.category.toLowerCase().includes(searchTerm.toLowerCase())
@@ -99,13 +137,24 @@ export default function BahanBakuPage() {
             </div>
           </div>
 
-          <button
-            onClick={() => setShowModal(true)}
-            className="flex items-center gap-2 px-4 py-3 bg-tea text-white rounded-lg hover:bg-tea-dark transition font-semibold"
-          >
-            <Plus className="w-5 h-5" />
-            <span>Tambah Bahan</span>
-          </button>
+          <div className="flex gap-3">
+            {/* 🔥 BUTTON UPLOAD EXCEL */}
+            <button
+              onClick={() => setShowUploadModal(true)}
+              className="flex items-center gap-2 px-4 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition font-semibold"
+            >
+              <Upload className="w-5 h-5" />
+              Upload Excel
+            </button>
+
+            <button
+              onClick={() => setShowModal(true)}
+              className="flex items-center gap-2 px-4 py-3 bg-tea text-white rounded-lg hover:bg-tea-dark transition font-semibold"
+            >
+              <Plus className="w-5 h-5" />
+              <span>Tambah Bahan</span>
+            </button>
+          </div>
         </div>
 
         {/* Search */}
@@ -136,7 +185,7 @@ export default function BahanBakuPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredMaterials.map((material) => {
             const isLowStock = Number(material.stock) < 10;
-            
+
             return (
               <div
                 key={material.id}
@@ -206,13 +255,47 @@ export default function BahanBakuPage() {
         </div>
       )}
 
-      {/* Modal */}
+      {/* Modal Tambah/Edit */}
       {showModal && (
         <RawMaterialModal
           material={editingMaterial}
           onClose={handleModalClose}
           onSuccess={handleModalSuccess}
         />
+      )}
+
+      {/* 🔥 Modal Upload Excel */}
+      {showUploadModal && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
+          <div className="bg-white w-full max-w-md rounded-xl p-6">
+            <h3 className="text-xl font-semibold mb-4">Upload Excel Bahan Baku</h3>
+
+            <form onSubmit={handleUploadExcel} className="space-y-4">
+              <input
+                type="file"
+                accept=".xlsx,.xls"
+                onChange={(e) => setUploadFile(e.target.files[0])}
+                className="w-full border p-2 rounded-lg"
+              />
+
+              <div className="flex gap-3 pt-3">
+                <button
+                  type="button"
+                  onClick={() => setShowUploadModal(false)}
+                  className="flex-1 py-2 border rounded-lg"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+                >
+                  Upload
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   );

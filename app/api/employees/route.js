@@ -1,4 +1,5 @@
 export const dynamic = 'force-dynamic';
+
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../auth/[...nextauth]/route";
@@ -8,7 +9,7 @@ import { authOptions } from "../auth/[...nextauth]/route";
  */
 export async function GET() {
   try {
-    const prisma = (await import('@/lib/prisma')).default;
+    const { prisma } = await import('@/lib/prisma');
 
     const employees = await prisma.employee.findMany({
       include: { shifts: true },
@@ -18,7 +19,10 @@ export async function GET() {
     return NextResponse.json(employees);
   } catch (error) {
     console.error("GET /api/employees error:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
   }
 }
 
@@ -27,7 +31,7 @@ export async function GET() {
  */
 export async function POST(request) {
   try {
-    const prisma = (await import('@/lib/prisma')).default;
+    const { prisma } = await import('@/lib/prisma');
 
     const session = await getServerSession(authOptions);
     if (!session || session.user.role !== "OWNER") {
@@ -74,7 +78,10 @@ export async function POST(request) {
     return NextResponse.json(employee, { status: 201 });
   } catch (error) {
     console.error("POST /api/employees error:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to create employee" },
+      { status: 500 }
+    );
   }
 }
 
@@ -83,7 +90,7 @@ export async function POST(request) {
  */
 export async function PUT(request) {
   try {
-    const prisma = (await import('@/lib/prisma')).default;
+    const { prisma } = await import('@/lib/prisma');
 
     const session = await getServerSession(authOptions);
     if (!session || session.user.role !== "OWNER") {
@@ -94,7 +101,10 @@ export async function PUT(request) {
     const { id, shifts, ...data } = body;
 
     if (!id) {
-      return NextResponse.json({ error: "Employee ID required" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Employee ID required" },
+        { status: 400 }
+      );
     }
 
     const updated = await prisma.employee.update({
@@ -106,7 +116,7 @@ export async function PUT(request) {
       },
     });
 
-    if (Array.isArray(shifts) && shifts.length > 0) {
+    if (Array.isArray(shifts)) {
       await prisma.$transaction(async (tx) => {
         for (const s of shifts) {
           if (s.id) {
@@ -134,7 +144,10 @@ export async function PUT(request) {
     return NextResponse.json(updated);
   } catch (error) {
     console.error("PUT /api/employees error:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to update employee" },
+      { status: 500 }
+    );
   }
 }
 
@@ -143,7 +156,7 @@ export async function PUT(request) {
  */
 export async function DELETE(request) {
   try {
-    const prisma = (await import('@/lib/prisma')).default;
+    const { prisma } = await import('@/lib/prisma');
 
     const session = await getServerSession(authOptions);
     if (!session || session.user.role !== "OWNER") {
@@ -154,7 +167,10 @@ export async function DELETE(request) {
     const id = searchParams.get("id");
 
     if (!id) {
-      return NextResponse.json({ error: "Employee ID required" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Employee ID required" },
+        { status: 400 }
+      );
     }
 
     await prisma.$transaction([
@@ -165,6 +181,9 @@ export async function DELETE(request) {
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("DELETE /api/employees error:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
   }
 }

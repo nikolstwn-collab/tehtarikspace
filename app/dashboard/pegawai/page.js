@@ -4,7 +4,15 @@ import { useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import toast from 'react-hot-toast';
 import EmployeeModal from '@/components/EmployeeModal';
-import { UserPlus, Search, Trash2, Edit2, CheckCircle, XCircle, Upload } from 'lucide-react';
+import {
+  UserPlus,
+  Search,
+  Trash2,
+  Edit2,
+  CheckCircle,
+  XCircle,
+  Upload,
+} from 'lucide-react';
 
 export default function PegawaiPage() {
   const { data: session } = useSession();
@@ -17,26 +25,34 @@ export default function PegawaiPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const isOwner = session?.user?.role === 'OWNER';
 
-  // === Fetch data pegawai ===
+  // ================= FETCH PEGAWAI =================
   async function fetchEmployees() {
     try {
       const res = await fetch('/api/employees');
       const data = await res.json();
-      setEmployees(data);
+      if (Array.isArray(data)) setEmployees(data);
+      else setEmployees([]);
     } catch {
       toast.error('Gagal memuat data pegawai');
     }
   }
 
-  // === Fetch absensi hari ini ===
+  // ================= FETCH ABSENSI =================
   async function fetchAttendance() {
     try {
       const res = await fetch('/api/attendance');
       const data = await res.json();
-      const today = new Date().toISOString().split('T')[0];
 
+      if (!Array.isArray(data)) {
+        setAttendance({});
+        return;
+      }
+
+      const today = new Date().toISOString().split('T')[0];
       const map = {};
+
       data.forEach((a) => {
+        if (!a?.date || !a?.employeeId) return;
         const date = new Date(a.date).toISOString().split('T')[0];
         if (date === today) {
           map[a.employeeId] = a.status;
@@ -49,12 +65,31 @@ export default function PegawaiPage() {
     }
   }
 
-  useEffect(() => {
-    fetchEmployees();
-    fetchAttendance();
-  }, []);
+  // ================= ABSENSI =================
+  async function handleAttendance(employeeId) {
+    try {
+      const res = await fetch('/api/attendance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ employeeId }),
+      });
 
-  // === Handle upload Excel ===
+      const data = await res.json();
+
+      if (!res.ok) {
+        toast.error(data.message || 'Gagal absen');
+        return;
+      }
+
+      toast.success('Absensi berhasil');
+      fetchAttendance();
+    } catch (error) {
+      console.error(error);
+      toast.error('Terjadi kesalahan saat absensi');
+    }
+  }
+
+  // ================= UPLOAD EXCEL =================
   async function handleUploadExcel(e) {
     e.preventDefault();
 
@@ -75,11 +110,11 @@ export default function PegawaiPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        toast.error(data.error || 'Gagal mengupload file');
+        toast.error(data.error || 'Gagal upload file');
         return;
       }
 
-      toast.success('Import pegawai berhasil!');
+      toast.success('Import pegawai berhasil');
       setShowUploadModal(false);
       setUploadFile(null);
       fetchEmployees();
@@ -89,10 +124,14 @@ export default function PegawaiPage() {
     }
   }
 
-  // === Hapus Pegawai ===
+  // ================= DELETE =================
   async function handleDelete(id) {
     if (!confirm('Yakin ingin menghapus pegawai ini?')) return;
-    const res = await fetch(`/api/employees?id=${id}`, { method: 'DELETE' });
+
+    const res = await fetch(`/api/employees?id=${id}`, {
+      method: 'DELETE',
+    });
+
     if (res.ok) {
       toast.success('Pegawai dihapus');
       fetchEmployees();
@@ -101,10 +140,16 @@ export default function PegawaiPage() {
     }
   }
 
+  useEffect(() => {
+    fetchEmployees();
+    fetchAttendance();
+  }, []);
+
   const filtered = employees.filter((e) =>
     e.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  // ================= UI =================
   return (
     <div className="p-6 space-y-6">
       {/* HEADER */}
@@ -112,7 +157,7 @@ export default function PegawaiPage() {
         <div>
           <h1 className="text-3xl font-bold text-gray-800">Kelola Pegawai</h1>
           <p className="text-gray-500 text-sm">
-            Lihat jadwal shift dan lakukan absensi harianmu.
+            Lihat jadwal shift dan lakukan absensi harian.
           </p>
         </div>
 
@@ -124,27 +169,25 @@ export default function PegawaiPage() {
               placeholder="Cari nama pegawai..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-tea focus:border-transparent"
+              className="pl-9 pr-3 py-2 border rounded-lg text-sm"
             />
           </div>
 
           {isOwner && (
             <>
-              {/* BUTTON UPLOAD */}
               <button
                 onClick={() => setShowUploadModal(true)}
-                className="flex items-center gap-2 bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition"
+                className="flex items-center gap-2 bg-blue-500 text-white px-4 py-2 rounded-lg"
               >
                 <Upload className="w-4 h-4" /> Upload Excel
               </button>
 
-              {/* BUTTON TAMBAH */}
               <button
                 onClick={() => {
                   setSelectedEmployee(null);
                   setShowModal(true);
                 }}
-                className="flex items-center gap-2 bg-tea text-white px-4 py-2 rounded-lg hover:bg-tea-dark transition"
+                className="flex items-center gap-2 bg-tea text-white px-4 py-2 rounded-lg"
               >
                 <UserPlus className="w-4 h-4" />
                 Tambah Pegawai
@@ -154,78 +197,61 @@ export default function PegawaiPage() {
         </div>
       </div>
 
-      {/* GRID KARYAWAN */}
+      {/* GRID */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
         {filtered.length === 0 ? (
-          <div className="col-span-full text-center text-gray-500 py-12 border border-dashed rounded-xl">
-            Tidak ada pegawai ditemukan.
+          <div className="col-span-full text-center text-gray-500 py-12">
+            Tidak ada pegawai
           </div>
         ) : (
           filtered.map((emp) => {
-            const status = attendance[emp.id];
+            const status = attendance?.[emp.id] ?? null;
             const isHadir = status === 'HADIR';
 
             return (
               <div
                 key={emp.id}
-                className="group relative bg-white border border-gray-200 rounded-2xl shadow-sm hover:shadow-md transition-all"
+                className="relative bg-white border rounded-xl"
               >
-                <div className="h-32 bg-gray-50 rounded-t-2xl flex items-center justify-center overflow-hidden">
+                <div className="h-32 bg-gray-100">
                   <img
-                    src={emp.photoUrl || 'https://via.placeholder.com/150?text=No+Photo'}
-                    alt={emp.name}
-                    className="object-cover w-full h-full"
+                    src={
+                      emp.photoUrl ||
+                      'https://via.placeholder.com/150?text=No+Photo'
+                    }
+                    className="w-full h-full object-cover"
                   />
                 </div>
 
-                <div className="p-4 space-y-1">
-                  <h3 className="font-semibold text-gray-800 text-lg">{emp.name}</h3>
-                  <p className="text-gray-500 text-sm">{emp.position}</p>
-                  <p className="text-sm text-gray-600">📞 {emp.phone}</p>
-                  <div className="text-xs text-gray-500 mt-1">
-                    Shift: {emp.shifts?.[0]?.shiftTime || 'Belum diatur'}
-                  </div>
+                <div className="p-4">
+                  <h3 className="font-semibold">{emp.name}</h3>
+                  <p className="text-sm text-gray-500">{emp.position}</p>
 
-                  {/* Tombol Absensi */}
-                  <div className="mt-3">
-                    <button
-                      onClick={() => handleAttendance(emp.id)}
-                      disabled={isHadir}
-                      className={`w-full flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium transition ${
-                        isHadir
-                          ? 'bg-green-100 text-green-700 border border-green-300 cursor-not-allowed'
-                          : 'bg-red-100 text-red-700 border border-red-300 hover:bg-red-200'
-                      }`}
-                    >
-                      {isHadir ? (
-                        <>
-                          <CheckCircle className="w-4 h-4" /> Hadir
-                        </>
-                      ) : (
-                        <>
-                          <XCircle className="w-4 h-4" /> Belum Absen
-                        </>
-                      )}
-                    </button>
-                  </div>
+                  <button
+                    onClick={() => handleAttendance(emp.id)}
+                    disabled={isHadir}
+                    className={`mt-3 w-full py-2 rounded-lg ${
+                      isHadir
+                        ? 'bg-green-100 text-green-700'
+                        : 'bg-red-100 text-red-700'
+                    }`}
+                  >
+                    {isHadir ? 'Hadir' : 'Belum Absen'}
+                  </button>
                 </div>
 
                 {isOwner && (
-                  <div className="absolute top-3 right-3 flex gap-2 opacity-0 group-hover:opacity-100 transition">
+                  <div className="absolute top-2 right-2 flex gap-2">
                     <button
                       onClick={() => {
                         setSelectedEmployee(emp);
                         setShowModal(true);
                       }}
-                      className="p-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition"
                     >
-                      <Edit2 className="w-4 h-4" />
+                      <Edit2 size={16} />
                     </button>
-                    <button
-                      onClick={() => handleDelete(emp.id)}
-                      className="p-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition"
-                    >
-                      <Trash2 className="w-4 h-4" />
+                    <button onClick={() => handleDelete(emp.id)}>
+                      <Trash2 size={16} />
                     </button>
                   </div>
                 )}
@@ -235,7 +261,6 @@ export default function PegawaiPage() {
         )}
       </div>
 
-      {/* Modal Tambah/Edit Pegawai */}
       {showModal && (
         <EmployeeModal
           employee={selectedEmployee}
@@ -246,40 +271,6 @@ export default function PegawaiPage() {
           }}
           currentUserRole={session?.user?.role}
         />
-      )}
-
-      {/* Modal Upload Excel */}
-      {showUploadModal && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
-          <div className="bg-white w-full max-w-md rounded-xl p-6">
-            <h3 className="text-xl font-semibold mb-4">Upload Excel Pegawai</h3>
-
-            <form onSubmit={handleUploadExcel} className="space-y-4">
-              <input
-                type="file"
-                accept=".xlsx,.xls"
-                onChange={(e) => setUploadFile(e.target.files[0])}
-                className="w-full border p-2 rounded-lg"
-              />
-
-              <div className="flex gap-3 pt-3">
-                <button
-                  type="button"
-                  onClick={() => setShowUploadModal(false)}
-                  className="flex-1 py-2 border rounded-lg"
-                >
-                  Batal
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
-                >
-                  Upload
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
       )}
     </div>
   );

@@ -98,7 +98,8 @@ export async function PUT(request) {
     }
 
     const body = await request.json();
-    const { id, shifts, ...data } = body;
+    const { id, shifts, shiftType, ...data } = body;
+// shiftType DIAMBIL tapi TIDAK dipakai ke prisma
 
     if (!id) {
       return NextResponse.json(

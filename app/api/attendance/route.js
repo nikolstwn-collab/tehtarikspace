@@ -1,13 +1,11 @@
 export const dynamic = 'force-dynamic';
 
 import { NextResponse } from 'next/server';
+import { prisma } from '@/lib/prisma';
 
-// === GET: Ambil semua absensi ===
+// GET semua absensi
 export async function GET() {
   try {
-    // ✅ lazy import prisma (AMAN DI VERCEL)
-    const prisma = (await import('@/lib/prisma')).default;
-
     const data = await prisma.attendance.findMany({
       include: { employee: true },
       orderBy: { date: 'desc' },
@@ -23,22 +21,26 @@ export async function GET() {
   }
 }
 
-// === POST: Simpan absensi hari ini ===
+// POST absen hari ini
 export async function POST(req) {
   try {
-    // ✅ lazy import prisma (AMAN DI VERCEL)
-    const prisma = (await import('@/lib/prisma')).default;
-
     const { employeeId, status } = await req.json();
 
+    if (!employeeId) {
+      return NextResponse.json(
+        { error: 'employeeId required' },
+        { status: 400 }
+      );
+    }
+
     const today = new Date();
-    const startOfDay = new Date(today.setHours(0, 0, 0, 0));
-    const endOfDay = new Date(startOfDay.getTime() + 24 * 60 * 60 * 1000);
+    const start = new Date(today.setHours(0, 0, 0, 0));
+    const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
 
     const existing = await prisma.attendance.findFirst({
       where: {
         employeeId,
-        date: { gte: startOfDay, lt: endOfDay },
+        date: { gte: start, lt: end },
       },
     });
 
@@ -57,10 +59,7 @@ export async function POST(req) {
       },
     });
 
-    return NextResponse.json({
-      message: 'Absensi berhasil disimpan!',
-      attendance,
-    });
+    return NextResponse.json({ attendance });
   } catch (error) {
     console.error('POST /attendance error:', error);
     return NextResponse.json(

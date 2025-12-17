@@ -1,8 +1,10 @@
-export const dynamic = 'force-dynamic';
-import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "../auth/[...nextauth]/route";
-import { prisma } from "@/lib/prisma";
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
+
+import { NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/authOptions'
+import { prisma } from '@/lib/prisma'
 
 /* ================================
    GET ALL PURCHASES
@@ -10,13 +12,19 @@ import { prisma } from "@/lib/prisma";
 export async function GET() {
   try {
     const purchases = await prisma.purchaseTransaction.findMany({
-      include: { user: { include: { employee: true } } },
-      orderBy: { transactionDate: "desc" },
-    });
-    return NextResponse.json(purchases);
+      include: {
+        user: { include: { employee: true } }
+      },
+      orderBy: { transactionDate: 'desc' }
+    })
+
+    return NextResponse.json(purchases)
   } catch (error) {
-    console.error("GET /api/purchases error:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    console.error('GET /api/purchases error:', error)
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
   }
 }
 
@@ -25,74 +33,74 @@ export async function GET() {
 ================================ */
 export async function POST(request) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await getServerSession(authOptions)
 
     if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const body = await request.json();
-    const { itemName, quantity, category, totalAmount, unit } = body;
+    const { itemName, quantity, category, totalAmount, unit } =
+      await request.json()
 
     if (!itemName || !quantity || !category || !totalAmount) {
-      return NextResponse.json({ error: "Data tidak lengkap" }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Data tidak lengkap' },
+        { status: 400 }
+      )
     }
 
     const purchase = await prisma.$transaction(async (tx) => {
-      // Ambil user dari session
       const dbUser = await tx.user.findFirst({
-        where: { username: session.user.username },
-      });
+        where: { username: session.user.username }
+      })
 
       if (!dbUser) {
-        return NextResponse.json(
-          { error: "User tidak ditemukan" },
-          { status: 400 }
-        );
+        throw new Error('User tidak ditemukan')
       }
 
-      // 1. Create purchase
       const newPurchase = await tx.purchaseTransaction.create({
         data: {
           itemName,
-          quantity: parseInt(quantity, 10),
+          quantity: Number(quantity),
           category,
-          totalAmount: parseFloat(totalAmount),
-          createdBy: dbUser.id,
-        },
-      });
+          totalAmount: Number(totalAmount),
+          createdBy: dbUser.id
+        }
+      })
 
-      // 2. Update or create raw material
       const existingMaterial = await tx.rawMaterial.findFirst({
-        where: { name: { equals: itemName, mode: "insensitive" } },
-      });
+        where: { name: { equals: itemName, mode: 'insensitive' } }
+      })
 
       if (existingMaterial) {
         await tx.rawMaterial.update({
           where: { id: existingMaterial.id },
           data: {
-            stock: { increment: parseInt(quantity, 10) },
-            updatedAt: new Date(),
-          },
-        });
+            stock: { increment: Number(quantity) },
+            updatedAt: new Date()
+          }
+        })
       } else {
         await tx.rawMaterial.create({
           data: {
             name: itemName,
             category,
-            stock: parseInt(quantity, 10),
-            unit: unit || "pcs",
-          },
-        });
+            stock: Number(quantity),
+            unit: unit || 'pcs'
+          }
+        })
       }
 
-      return newPurchase;
-    });
+      return newPurchase
+    })
 
-    return NextResponse.json(purchase, { status: 201 });
+    return NextResponse.json(purchase, { status: 201 })
   } catch (error) {
-    console.error("POST /api/purchases error:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error('POST /api/purchases error:', error)
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
   }
 }
 
@@ -101,65 +109,64 @@ export async function POST(request) {
 ================================ */
 export async function PUT(request) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await getServerSession(authOptions)
     if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const body = await request.json();
-    const { id, itemName, quantity, category, totalAmount } = body;
+    const { id, itemName, quantity, category, totalAmount } =
+      await request.json()
 
     if (!id || !itemName || !quantity || !category || !totalAmount) {
-      return NextResponse.json({ error: "Data tidak lengkap" }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Data tidak lengkap' },
+        { status: 400 }
+      )
     }
 
     const updated = await prisma.$transaction(async (tx) => {
-      // 1. Ambil record lama
       const oldPurchase = await tx.purchaseTransaction.findUnique({
-        where: { id },
-      });
+        where: { id }
+      })
 
       if (!oldPurchase) {
-        return NextResponse.json(
-          { error: "Transaksi tidak ditemukan" },
-          { status: 404 }
-        );
+        throw new Error('Transaksi tidak ditemukan')
       }
 
-      // 2. Hitung selisih quantity
-      const diffQty = parseInt(quantity) - oldPurchase.quantity;
+      const diffQty = Number(quantity) - oldPurchase.quantity
 
-      // 3. Update raw material berdasarkan selisih
       const material = await tx.rawMaterial.findFirst({
-        where: { name: { equals: itemName, mode: "insensitive" } },
-      });
+        where: { name: { equals: itemName, mode: 'insensitive' } }
+      })
 
       if (material) {
         await tx.rawMaterial.update({
           where: { id: material.id },
           data: {
             stock: { increment: diffQty },
-            updatedAt: new Date(),
-          },
-        });
+            updatedAt: new Date()
+          }
+        })
       }
 
-      // 4. Update purchase
       return await tx.purchaseTransaction.update({
         where: { id },
         data: {
           itemName,
-          quantity: parseInt(quantity, 10),
+          quantity: Number(quantity),
           category,
-          totalAmount: parseFloat(totalAmount),
-        },
-      });
-    });
+          totalAmount: Number(totalAmount)
+        }
+      })
+    })
 
-    return NextResponse.json(updated);
+    return NextResponse.json(updated)
   } catch (error) {
-    console.error("PUT /api/purchases error:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    console.error('PUT /api/purchases error:', error)
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
   }
 }
 
@@ -168,17 +175,31 @@ export async function PUT(request) {
 ================================ */
 export async function DELETE(request) {
   try {
-    const { searchParams } = new URL(request.url);
-    const id = searchParams.get("id");
-
-    if (!id) {
-      return NextResponse.json({ error: "ID tidak ditemukan" }, { status: 400 });
+    const session = await getServerSession(authOptions)
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    await prisma.purchaseTransaction.delete({ where: { id } });
-    return NextResponse.json({ success: true });
+    const { searchParams } = new URL(request.url)
+    const id = searchParams.get('id')
+
+    if (!id) {
+      return NextResponse.json(
+        { error: 'ID tidak ditemukan' },
+        { status: 400 }
+      )
+    }
+
+    await prisma.purchaseTransaction.delete({
+      where: { id }
+    })
+
+    return NextResponse.json({ success: true })
   } catch (error) {
-    console.error("DELETE /api/purchases error:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    console.error('DELETE /api/purchases error:', error)
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
   }
 }

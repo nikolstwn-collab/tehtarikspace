@@ -2,39 +2,33 @@ export const dynamic = 'force-dynamic';
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../auth/[...nextauth]/route";
-import { prisma } from "@/lib/prisma";
 
 /**
  * GET /api/employees
- * - Owner: lihat semua pegawai + shift
- * - Karyawan: lihat daftar pegawai & shift tanpa bisa edit
  */
 export async function GET() {
   try {
+    const prisma = (await import('@/lib/prisma')).default;
+
     const employees = await prisma.employee.findMany({
-      include: {
-        shifts: true,
-      },
+      include: { shifts: true },
       orderBy: { createdAt: "desc" },
     });
 
     return NextResponse.json(employees);
   } catch (error) {
     console.error("GET /api/employees error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
 
 /**
  * POST /api/employees
- * - Owner menambah pegawai baru
- * - Otomatis membuat shift default (Senin–Sabtu)
  */
 export async function POST(request) {
   try {
+    const prisma = (await import('@/lib/prisma')).default;
+
     const session = await getServerSession(authOptions);
     if (!session || session.user.role !== "OWNER") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
@@ -52,7 +46,6 @@ export async function POST(request) {
       shiftType,
     } = body;
 
-    // 1️⃣ Buat pegawai baru
     const employee = await prisma.employee.create({
       data: {
         name,
@@ -65,7 +58,6 @@ export async function POST(request) {
       },
     });
 
-    // 2️⃣ Buat shift default (Senin–Sabtu)
     const days = ["SENIN", "SELASA", "RABU", "KAMIS", "JUMAT", "SABTU"];
     const shiftTime =
       shiftType === "MALAM" ? "17:00 - 23:00" : "07:00 - 17:00";
@@ -88,53 +80,36 @@ export async function POST(request) {
 
 /**
  * PUT /api/employees
- * - Owner dapat update pegawai + shift
- * - Body bisa berisi { id, name, ..., shifts: [{dayOfWeek, shiftTime, isActive}] }
  */
 export async function PUT(request) {
   try {
+    const prisma = (await import('@/lib/prisma')).default;
+
     const session = await getServerSession(authOptions);
     if (!session || session.user.role !== "OWNER") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 
     const body = await request.json();
-    const {
-      id,
-      name,
-      birthDate,
-      address,
-      gender,
-      phone,
-      position,
-      photoUrl,
-      shifts,
-    } = body;
+    const { id, shifts, ...data } = body;
 
     if (!id) {
       return NextResponse.json({ error: "Employee ID required" }, { status: 400 });
     }
 
-    // 1️⃣ Update data pegawai
     const updated = await prisma.employee.update({
       where: { id },
       data: {
-        name,
-        birthDate: new Date(birthDate),
-        address,
-        gender,
-        phone,
-        position,
-        photoUrl: photoUrl || null,
+        ...data,
+        birthDate: new Date(data.birthDate),
+        photoUrl: data.photoUrl || null,
       },
     });
 
-    // 2️⃣ Jika ada shift di body, update juga
     if (Array.isArray(shifts) && shifts.length > 0) {
       await prisma.$transaction(async (tx) => {
         for (const s of shifts) {
           if (s.id) {
-            // Jika ada ID shift → update
             await tx.shift.update({
               where: { id: s.id },
               data: {
@@ -143,7 +118,6 @@ export async function PUT(request) {
               },
             });
           } else {
-            // Jika tidak ada ID shift → create baru
             await tx.shift.create({
               data: {
                 employeeId: id,
@@ -165,11 +139,12 @@ export async function PUT(request) {
 }
 
 /**
- * DELETE /api/employees?id=xyz
- * - Owner hapus pegawai (otomatis hapus shift-nya juga)
+ * DELETE /api/employees
  */
 export async function DELETE(request) {
   try {
+    const prisma = (await import('@/lib/prisma')).default;
+
     const session = await getServerSession(authOptions);
     if (!session || session.user.role !== "OWNER") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
@@ -178,10 +153,10 @@ export async function DELETE(request) {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");
 
-    if (!id)
+    if (!id) {
       return NextResponse.json({ error: "Employee ID required" }, { status: 400 });
+    }
 
-    // Hapus semua shift + pegawai
     await prisma.$transaction([
       prisma.shift.deleteMany({ where: { employeeId: id } }),
       prisma.employee.delete({ where: { id } }),

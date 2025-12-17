@@ -1,4 +1,4 @@
-// app/api/shifts/route.js
+export const dynamic = 'force-dynamic'
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../auth/[...nextauth]/route';

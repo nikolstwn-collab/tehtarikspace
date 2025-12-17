@@ -147,11 +147,11 @@ export default function LoginPage() {
             <div className="grid grid-cols-2 gap-3 text-xs">
               <div className="bg-gray-50 p-3 rounded-lg">
                 <p className="font-semibold text-gray-700 mb-1">Owner</p>
-                <p className="text-gray-600">owner / owner123</p>
+                <p className="text-gray-600">admin / 1234</p>
               </div>
               <div className="bg-gray-50 p-3 rounded-lg">
                 <p className="font-semibold text-gray-700 mb-1">Karyawan</p>
-                <p className="text-gray-600">karyawan / karyawan123</p>
+                <p className="text-gray-600">staff / 12345</p>
               </div>
             </div>
           </div>

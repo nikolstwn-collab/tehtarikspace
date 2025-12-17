@@ -123,7 +123,7 @@ export default function LandingPage() {
                 <a href="#benefits" className="px-4 py-2 text-gray-700 hover:bg-gray-50 rounded-lg">Keunggulan</a>
                 <a href="#demo" className="px-4 py-2 text-gray-700 hover:bg-gray-50 rounded-lg">Demo</a>
                 <Link 
-                  href="/login"
+                  href="/auth"
                   className="mx-4 px-6 py-2 bg-tea text-white rounded-lg hover:bg-tea-dark transition font-medium text-center"
                 >
                   Login
@@ -157,14 +157,14 @@ export default function LandingPage() {
 
               <div className="flex flex-col sm:flex-row gap-4">
                 <Link 
-                  href="/login"
+                  href="/auth"
                   className="px-8 py-4 bg-tea text-white rounded-xl hover:bg-tea-dark transition font-semibold flex items-center justify-center gap-2 shadow-lg hover:shadow-xl"
                 >
                   Mulai Sekarang
                   <ArrowRight className="w-5 h-5" />
                 </Link>
                 <a 
-                  href="#demo"
+                  href="/auth"
                   className="px-8 py-4 bg-white border-2 border-tea text-tea rounded-xl hover:bg-cream transition font-semibold flex items-center justify-center gap-2"
                 >
                   <Coffee className="w-5 h-5" />
@@ -349,18 +349,18 @@ export default function LandingPage() {
           <div className="grid md:grid-cols-2 gap-6 mb-8">
             <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-white/20">
               <p className="text-cream-dark text-sm mb-3">Demo Owner</p>
-              <p className="text-white font-bold text-lg mb-1">owner</p>
-              <p className="text-cream">owner123</p>
+              <p className="text-white font-bold text-lg mb-1">admin</p>
+              <p className="text-cream">1234</p>
             </div>
             <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-white/20">
               <p className="text-cream-dark text-sm mb-3">Demo Karyawan</p>
-              <p className="text-white font-bold text-lg mb-1">karyawan</p>
-              <p className="text-cream">karyawan123</p>
+              <p className="text-white font-bold text-lg mb-1">staff</p>
+              <p className="text-cream">12345</p>
             </div>
           </div>
 
           <Link 
-            href="/login"
+            href="/auth"
             className="inline-flex items-center gap-3 px-8 py-4 bg-white text-tea rounded-xl hover:bg-cream transition font-semibold shadow-2xl hover:shadow-xl"
           >
             Login & Coba Sekarang

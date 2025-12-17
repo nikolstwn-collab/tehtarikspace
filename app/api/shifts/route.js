@@ -2,32 +2,23 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 import { NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/authOptions'
 import { prisma } from '@/lib/prisma'
 import jwt from 'jsonwebtoken'
 
-const JWT_SECRET = process.env.JWT_SECRET
-if (!JWT_SECRET) {
-  throw new Error('JWT_SECRET is not defined')
-}
-
-// 🔐 Helper: ambil session atau bearer token
-async function getSessionOrToken(request) {
+// ================================
+// Helper: ambil user dari Bearer token
+// ================================
+function getUserFromRequest(request) {
   try {
-    const session = await getServerSession(authOptions)
-    if (session?.user) return session
-
     const authHeader = request.headers.get('authorization')
-    if (authHeader?.startsWith('Bearer ')) {
-      const token = authHeader.split(' ')[1]
-      const decoded = jwt.verify(token, JWT_SECRET)
-      return { user: decoded }
-    }
+    if (!authHeader?.startsWith('Bearer ')) return null
 
-    return null
-  } catch (error) {
-    console.error('❌ Token/session verification failed:', error)
+    const token = authHeader.split(' ')[1]
+    const secret = process.env.JWT_SECRET
+    if (!secret) return null
+
+    return jwt.verify(token, secret)
+  } catch {
     return null
   }
 }
@@ -37,15 +28,15 @@ async function getSessionOrToken(request) {
 // ================================
 export async function GET(request) {
   try {
-    const session = await getSessionOrToken(request)
-    if (!session) {
+    const user = getUserFromRequest(request)
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const { searchParams } = new URL(request.url)
     const employeeId = searchParams.get('employeeId')
 
-    if (session.user.role === 'OWNER') {
+    if (user.role === 'OWNER') {
       const shifts = await prisma.shift.findMany({
         include: { employee: true },
         orderBy: { createdAt: 'desc' }
@@ -53,7 +44,7 @@ export async function GET(request) {
       return NextResponse.json(shifts)
     }
 
-    if (session.user.role === 'EMPLOYEE') {
+    if (user.role === 'EMPLOYEE') {
       if (!employeeId) {
         return NextResponse.json(
           { error: 'Employee ID required' },
@@ -65,7 +56,6 @@ export async function GET(request) {
         where: { employeeId },
         orderBy: { createdAt: 'desc' }
       })
-
       return NextResponse.json(shifts)
     }
 
@@ -74,7 +64,7 @@ export async function GET(request) {
       { status: 403 }
     )
   } catch (error) {
-    console.error('❌ GET shifts error:', error)
+    console.error('GET shifts error:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -87,8 +77,8 @@ export async function GET(request) {
 // ================================
 export async function POST(request) {
   try {
-    const session = await getSessionOrToken(request)
-    if (!session || session.user.role !== 'OWNER') {
+    const user = getUserFromRequest(request)
+    if (!user || user.role !== 'OWNER') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
 
@@ -113,7 +103,7 @@ export async function POST(request) {
 
     return NextResponse.json(shift, { status: 201 })
   } catch (error) {
-    console.error('❌ POST shift error:', error)
+    console.error('POST shift error:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -126,8 +116,8 @@ export async function POST(request) {
 // ================================
 export async function PUT(request) {
   try {
-    const session = await getSessionOrToken(request)
-    if (!session || session.user.role !== 'OWNER') {
+    const user = getUserFromRequest(request)
+    if (!user || user.role !== 'OWNER') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
 
@@ -152,7 +142,7 @@ export async function PUT(request) {
 
     return NextResponse.json(shift)
   } catch (error) {
-    console.error('❌ PUT shift error:', error)
+    console.error('PUT shift error:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -165,8 +155,8 @@ export async function PUT(request) {
 // ================================
 export async function DELETE(request) {
   try {
-    const session = await getSessionOrToken(request)
-    if (!session || session.user.role !== 'OWNER') {
+    const user = getUserFromRequest(request)
+    if (!user || user.role !== 'OWNER') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
 
@@ -184,7 +174,7 @@ export async function DELETE(request) {
 
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('❌ DELETE shift error:', error)
+    console.error('DELETE shift error:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
